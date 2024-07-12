@@ -1,0 +1,18 @@
+{
+    "name": "review-collector",
+    "version": "1.0",
+    "summary": "Review Collector",
+    "category": "Tools",
+    "type": "module",
+    "dependencies": {
+        "@nesk/puphpeteer": "^2.0.0",
+        "mysql2": "^3.10.1",
+        "puppeteer": "^22.11.1"
+    },
+    "scripts": {
+        "start": "node --env-file=.env crawler.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "Felix A. Schultz",
+    "license": "ISC"
+}

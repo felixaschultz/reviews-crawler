@@ -1,0 +1,10 @@
+{
+    "require-dev": {
+        "nesk/puphpeteer": "^2.0"
+    },
+    "require": {
+        "fabpot/goutte": "^4.0",
+        "calcinai/php-imagick": "^0.1.2",
+        "facebook/webdriver": "^1.1"
+    }
+}
