@@ -5,10 +5,7 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 require_once 'vendor/autoload.php';
 require_once 'getGoogleReviews.php';
-$server = "mysql73.unoeuro.com";
-$user = "cykelfaergen_info";
-$password = "natwh9kp";
-$database = "cykelfaergen_info_db_website";
+require_once 'db.php';
 
 $db = new mysqli($server, $user, $password, $database);
 
@@ -183,21 +180,17 @@ if (isset($_GET["trustpilot"])) {
         // Remove the rest of the string after the image tag
         $reviewStars = substr($reviewStars, 0, strpos($reviewStars, '>') + 1);
 
-        // Get the label if the review is verified from the button > div tag
-        $verified = $xpath->query('//button > div[@class="typography_body-m__xgxZ_"]');
+        // Get the button element with the data-review-label-tooltip-trigger attribute and get only its child div element
+        $verified = $xpath->query('//button[@data-review-label-tooltip-trigger]')->item(0)->firstChild;
         // Convert the verified to string
-        $verified = $dom->saveHTML($verified->item(0));
-        // Get only the div tag with content from the verified string
-        $verified = substr($verified, strpos($verified, '<div'));
-        // Remove the rest of the string after the div tag
-        $verified = substr($verified, 0, strpos($verified, '</div>') + 6);
+        $verified = $verified->nodeValue;
 
         // Check the database if the review already exists in reviewsArchive table
         $check = $db->query("SELECT * FROM reviewsArchive WHERE title = '" . htmlentities($headline) . "' AND body = '" . htmlentities($reviewBody) . "' AND author = '" . $author . "' AND writtenDate = '" . $writtenDate . "' AND lang = '" . $lang . "'");
         $num = $check->num_rows;
 
         if ($num == 0) {
-            $saveIntoTheDB = "INSERT INTO reviewsArchive (title, body, starImage, author, writtenDate, lang, `status`) VALUES ('" . htmlentities($headline) . "', '" . htmlentities($reviewBody) . "', '" . $reviewStars . "', '" . $author . "', '" . $writtenDate . "', '" . $lang . "', '" . $verified . "')";
+            $saveIntoTheDB = "INSERT INTO reviewsArchive (title, body, starImage, author, writtenDate, lang, `status`, verified) VALUES ('" . htmlentities($headline) . "', '" . htmlentities($reviewBody) . "', '" . $reviewStars . "', '" . $author . "', '" . $writtenDate . "', '" . $lang . "', '" . $verified . "', '" . $verified . "')";
             $db->query($saveIntoTheDB);
         }
 
