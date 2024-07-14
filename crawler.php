@@ -7,8 +7,6 @@ require_once 'vendor/autoload.php';
 require_once 'getGoogleReviews.php';
 require_once 'db.php';
 
-$db = new mysqli($server, $user, $password, $database);
-
 if (!$db) {
     die("Could not connect to database: " . mysqli_connect_error());
 }
