@@ -14,10 +14,9 @@ if (!$db) {
 use Goutte\Client;
 
 if (isset($_GET["trustpilot"])) {
-    $url = "https://www.trustpilot.com/review/cykelfaergen.info?stars=4&stars=5";
+    $page = isset($_GET["page"]) ? "&page=" . $_GET["page"] : "";
+    $url = "https://www.trustpilot.com/review/cykelfaergen.info?stars=4&stars=5" . $page;
     $lang = "en-GB";
-    $rated = "Rated ";
-    $outof = " out of ";
     $client = new Client();
     $crawler = $client->request('GET', $url);
 
@@ -69,7 +68,7 @@ if (isset($_GET["trustpilot"])) {
         foreach ($fullRating as $rating) {
             $rating = $rating->nodeValue;
 
-            $sql = "SELECT aggregateNumber FROM totalReviews WHERE lang = '" . $lang . "'";
+            $sql = "SELECT aggregateNumber FROM totalReviews WHERE aggregateNumber = '" . $rating . "' AND lang = '" . $lang . "'";
             $result = $db->query($sql);
             $row = $result->fetch_assoc();
 
@@ -134,6 +133,10 @@ if (isset($_GET["trustpilot"])) {
             $headline = $xpath->query('//h2[@data-service-review-title-typography="true"]')->item(0)->nodeValue;
             $reviewBody = $xpath->query('//p[@data-service-review-text-typography="true"]')->item(0)->nodeValue;
 
+            // Get Headline parent element and get the href attribute
+            $headlineParentLink = $xpath->query('//h2[@data-service-review-title-typography="true"]')->item(0)->parentNode->attributes->getNamedItem('href');
+            $headlineParentLink = $headlineParentLink->nodeValue;
+
             $datePublished = $userRating->firstElementChild->nextElementSibling->firstChild->getAttribute('datetime');
 
             // Add a class property to the author element
@@ -184,11 +187,11 @@ if (isset($_GET["trustpilot"])) {
         $verified = $verified->nodeValue;
 
         // Check the database if the review already exists in reviewsArchive table
-        $check = $db->query("SELECT * FROM reviewsArchive WHERE title = '" . htmlentities($headline) . "' AND body = '" . htmlentities($reviewBody) . "' AND author = '" . $author . "' AND writtenDate = '" . $writtenDate . "' AND lang = '" . $lang . "'");
+        $check = $db->query("SELECT * FROM reviewsArchive WHERE link = '" . $headlineParentLink . "' AND writtenDate = '" . $writtenDate . "' AND lang = '" . $lang . "'");
         $num = $check->num_rows;
 
         if ($num == 0) {
-            $saveIntoTheDB = "INSERT INTO reviewsArchive (title, body, starImage, author, writtenDate, lang, `status`, verified) VALUES ('" . htmlentities($headline) . "', '" . htmlentities($reviewBody) . "', '" . $reviewStars . "', '" . $author . "', '" . $writtenDate . "', '" . $lang . "', '" . $verified . "', '" . $verified . "')";
+            $saveIntoTheDB = "INSERT INTO reviewsArchive (title, body, starImage, author, writtenDate, lang, `status`, verified, link) VALUES ('" . htmlentities($headline) . "', '" . htmlentities($reviewBody) . "', '" . $reviewStars . "', '" . $author . "', '" . $writtenDate . "', '" . $lang . "', '" . $verified . "', '" . $verified . "', '" . $headlineParentLink . "')";
             $db->query($saveIntoTheDB);
         }
 
@@ -226,8 +229,9 @@ if (isset($_GET["trustpilot"])) {
         $modifyedHtml = preg_replace('/^.*<html[^>]*>|<\/html>.*$/is', '', $modifyedHtml);
         $modifyedHtml = preg_replace('/^.*<!DOCTYPE[^>]*>|<html[^>]*>|<head[^>]*>|<body[^>]*>|<\/body>|<\/head>|<\/html>.*$/is', '', $modifyedHtml);
 
-        echo $modifyedHtml;
+        $trustscore = str_replace(",", ".", $trustscore);
 
+        echo $modifyedHtml;
         $delete = $db->query("DELETE FROM totalReviews WHERE lang = '" . $lang . "'");
         $insertTotalReviews = "INSERT INTO totalReviews (lang,total_reviews, aggregateRatingMeta, aggregateNumber) VALUES ('" . $lang . "','" . $totalReviewsPlus . "', '" . htmlentities($aggregateRatingMetaInfo) . "', '" . $trustscore . "')";
         $db->query($insertTotalReviews);
