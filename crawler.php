@@ -14,11 +14,11 @@ if (!$db) {
 use Goutte\Client;
 
 if (isset($_GET["trustpilot"])) {
-    $page = isset($_GET["page"]) ? "&page=" . $_GET["page"] : "";
-    $url = "https://www.trustpilot.com/review/cykelfaergen.info?stars=4&stars=5" . $page;
-    $lang = "en-GB";
+    $page = isset($_GET["page"]) && $_GET["page"] != "" ? "&page=" . $_GET["page"] : "";
+    $url = $_GET["url"] . "?stars=4&stars=5" . $page;
+    $lang = $_GET["lang"];
     $client = new Client();
-    $crawler = $client->request('GET', $url);
+    $crawler = $client->request(method: 'GET', uri: $url);
 
     // Check for crawler status
     /* if ($client->getResponse()->getStatus() == 200) {
