@@ -14,11 +14,14 @@ if (!$db) {
 use Goutte\Client;
 
 if (isset($_GET["trustpilot"])) {
-    $page = isset($_GET["page"]) && $_GET["page"] != "" ? "&page=" . $_GET["page"] : "";
-    $url = $_GET["url"] . "?stars=4&stars=5" . $page;
+    $stars = isset($_GET["stars"]) && $_GET["stars"] != "" ? "?stars=" . $_GET["stars"] : "";
+    $url = $_GET["url"];
+
     $lang = $_GET["lang"];
     $client = new Client();
     $crawler = $client->request(method: 'GET', uri: $url);
+
+    echo $crawler->getUri();
 
     // Check for crawler status
     /* if ($client->getResponse()->getStatus() == 200) {
@@ -28,10 +31,16 @@ if (isset($_GET["trustpilot"])) {
     } */
 
     // Get the first element with the class 'styles_reviewCardInner__EwDq2'
-    $elements = $crawler->filter('.styles_reviewCardInner__EwDq2');
+    $elements = $crawler->filter('.styles_reviewCard__meSdm');
+    echo $elements->count();
+    if ($elements->count() == 0) {
+        echo "No reviews found";
+        exit;
+    }
     foreach ($elements as $element) {
         $item = new DOMElement($element->nodeName, $element->nodeValue);
         $html = $element->ownerDocument->saveHTML($element);
+
         /* Set encoding */
         $html = mb_convert_encoding($html, 'HTML-ENTITIES', "UTF-8");
 
@@ -42,13 +51,13 @@ if (isset($_GET["trustpilot"])) {
         libxml_clear_errors();
         $xpath = new DOMXPath($dom);
 
-        $fullRating = $crawler->filter('.styles_rating__uyC6m');
+        $fullRating = $crawler->filter('.star-rating_starRating__sdbkn');
         $totalReviews = $crawler->filter('[data-reviews-count-typography]')->text();
 
-        $aggregateNumber = $crawler->filter('.styles_clickable__zQWyh')->text();
+        $aggregateNumber = $crawler->filter('[data-rating-typography="true"]')->text();
 
         if (strpos($url, 'location/langballigau') === false) {
-            $totalReviewsPlus = $crawler->filter('.styles_clickable__zQWyh')->text();
+            $totalReviewsPlus = $crawler->filter('[data-rating-typography="true"]')->text();
         } else {
             $sql = "SELECT * FROM totalReviews WHERE lang = '" . $lang . "'";
             $result = $db->query($sql);
@@ -57,7 +66,7 @@ if (isset($_GET["trustpilot"])) {
         }
 
 
-        $totalStars = $crawler->filter('.star-rating_medium__iN6Ty img');
+        $totalStars = $crawler->filter('.star-rating_responsive__AzPOl img')->attr('src');
 
         $totalReviews = str_replace(" total", "", $totalReviews);
         $totalReviews = str_replace(" i alt", "", $totalReviews);
@@ -77,8 +86,6 @@ if (isset($_GET["trustpilot"])) {
             } else {
                 $trustscore = $row['aggregateNumber'];
             }
-
-            $totalStars = $totalStars->attr('src');
 
             if (strpos($url, 'location/langballigau') === false) {
                 $aggregateRating .= '<img src="' . $totalStars . '" alt="Rated to ' . $rating . '" class="trustRating">';
@@ -171,9 +178,9 @@ if (isset($_GET["trustpilot"])) {
         $userName = $xpath->query('//span[@data-consumer-name-typography="true"]');
         $headline = $xpath->query('//h2[@data-service-review-title-typography="true"]')->item(0)->nodeValue;
         $reviewBody = $xpath->query('//p[@data-service-review-text-typography="true"]')->item(0)->nodeValue;
-        $writtenDate = $xpath->query('//time[@data-service-review-date-time-ago="true"]')->item(0)->getAttribute('datetime');
+        $writtenDate = $xpath->query('//p[@data-service-review-date-of-experience-typography="true"]')->item(0)->getAttribute('span');
         // Find the div element with the class star-rating_medium__iN6Ty
-        $reviewStars = $xpath->query('//div[@class="styles_reviewHeader__iU9Px"]');
+        $reviewStars = $xpath->query('//div[@class="styles_reviewHeader__DzoAZ"]');
         // Convert reviewStars to string
         $reviewStars = $dom->saveHTML($reviewStars->item(0));
         // Get only the image tag from the reviewStars string
@@ -182,7 +189,7 @@ if (isset($_GET["trustpilot"])) {
         $reviewStars = substr($reviewStars, 0, strpos($reviewStars, '>') + 1);
 
         // Get the button element with the data-review-label-tooltip-trigger attribute and get only its child div element
-        $verified = $xpath->query('//button[@data-review-label-tooltip-trigger]')->item(0)->firstChild;
+        $verified = $xpath->query('//div[@data-review-label-tooltip-trigger-typography]')->item(0)->firstChild;
         // Convert the verified to string
         $verified = $verified->nodeValue;
 

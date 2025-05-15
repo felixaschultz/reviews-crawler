@@ -19,6 +19,8 @@
             <option value="en-GB">English</option>
             <option value="de-DE">German</option>
         </select>
+        <input type="hidden" name="stars" value="5">
+        <input type="hidden" name="stars" value="4">
         <button type="submit">Submit</button>
     </form>
 </body>
