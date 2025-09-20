@@ -15,13 +15,12 @@ use Goutte\Client;
 
 if (isset($_GET["trustpilot"])) {
     $stars = isset($_GET["stars"]) && $_GET["stars"] != "" ? "?stars=" . $_GET["stars"] : "";
-    $url = $_GET["url"];
+    $page = isset($_GET["page"]) && $_GET["page"] != "" ? "?page=" . $_GET["page"] : "";
+    $url = $_GET["url"] . $page;
 
     $lang = $_GET["lang"];
     $client = new Client();
     $crawler = $client->request(method: 'GET', uri: $url);
-
-    echo $crawler->getUri();
 
     // Check for crawler status
     /* if ($client->getResponse()->getStatus() == 200) {
@@ -31,18 +30,24 @@ if (isset($_GET["trustpilot"])) {
     } */
 
     // Get the first element with the class 'styles_reviewCardInner__EwDq2'
-    $elements = $crawler->filter('.styles_reviewCard__meSdm');
-    echo $elements->count();
+    $elements = $crawler->filter('.styles_cardWrapper__g8amG');
     if ($elements->count() == 0) {
-        echo "No reviews found";
+        echo "No reviews found" . $url;
         exit;
     }
+
     foreach ($elements as $element) {
+
+        //         --- IGNORE ---
+
         $item = new DOMElement($element->nodeName, $element->nodeValue);
         $html = $element->ownerDocument->saveHTML($element);
+        //         --- IGNORE ---
 
         /* Set encoding */
-        $html = mb_convert_encoding($html, 'HTML-ENTITIES', "UTF-8");
+        $html = mb_convert_encoding($html, 'HTML-ENTITIES');
+
+        echo $html;
 
         /* Find user name via the Saved html */
         $dom = new DOMDocument();
@@ -51,13 +56,14 @@ if (isset($_GET["trustpilot"])) {
         libxml_clear_errors();
         $xpath = new DOMXPath($dom);
 
-        $fullRating = $crawler->filter('.star-rating_starRating__sdbkn');
+        $fullRating = $crawler->filter('.styles_trustScore__MVJJI')->text();
+
         $totalReviews = $crawler->filter('[data-reviews-count-typography]')->text();
 
         $aggregateNumber = $crawler->filter('[data-rating-typography="true"]')->text();
 
         if (strpos($url, 'location/langballigau') === false) {
-            $totalReviewsPlus = $crawler->filter('[data-rating-typography="true"]')->text();
+            $totalReviewsPlus = $crawler->filter('[data-reviews-count-typography="true"]')->text();
         } else {
             $sql = "SELECT * FROM totalReviews WHERE lang = '" . $lang . "'";
             $result = $db->query($sql);
@@ -65,32 +71,35 @@ if (isset($_GET["trustpilot"])) {
             $totalReviewsPlus = $row['total_reviews'];
         }
 
+        $totalStars = $crawler->filter('.styles_ratingDistributionCard__qgoBg img')->attr('src');
 
-        $totalStars = $crawler->filter('.star-rating_responsive__AzPOl img')->attr('src');
-
-        $totalReviews = str_replace(" total", "", $totalReviews);
-        $totalReviews = str_replace(" i alt", "", $totalReviews);
+        $totalReviews = str_replace("total", "", $totalReviewsPlus);
+        $totalReviews = str_replace("i alt", "", $totalReviews);
         $totalReviews = str_replace("Insgesamt", "", $totalReviews);
         $reviewItems = array();
         $aggregateRating = '';
         $trustscore = '';
-        foreach ($fullRating as $rating) {
-            $rating = $rating->nodeValue;
 
-            $sql = "SELECT aggregateNumber FROM totalReviews WHERE aggregateNumber = '" . $rating . "' AND lang = '" . $lang . "'";
-            $result = $db->query($sql);
-            $row = $result->fetch_assoc();
+        echo $totalReviews;
 
-            if (strpos($url, 'location/langballigau') === false) {
-                $trustscore = $rating;
-            } else {
-                $trustscore = $row['aggregateNumber'];
-            }
+        $rating = $fullRating;
 
-            if (strpos($url, 'location/langballigau') === false) {
-                $aggregateRating .= '<img src="' . $totalStars . '" alt="Rated to ' . $rating . '" class="trustRating">';
+        $sql = "SELECT aggregateNumber FROM totalReviews WHERE aggregateNumber = '" . $rating . "' AND lang = '" . $lang . "'";
+        $result = $db->query($sql);
+        $row = $result->fetch_assoc();
 
-                $aggregateRatingMetaInfo = '
+        if (strpos($url, 'location/langballigau') === false) {
+            $trustscore = $rating;
+        } else {
+            $trustscore = $row['aggregateNumber'];
+        }
+
+
+
+        if (strpos($url, 'location/langballigau') === false) {
+            $aggregateRating .= '<img src="' . $totalStars . '" alt="Rated to ' . $rating . '" class="trustRating">';
+
+            $aggregateRatingMetaInfo = '
                 <div itemprop="aggregateRating" itemscope itemtype="https://schema.org/AggregateRating">
                     <meta itemprop="ratingValue" content="' . $rating . '">
                     <meta itemprop="reviewCount" content="' . $totalReviews . '">
@@ -98,15 +107,10 @@ if (isset($_GET["trustpilot"])) {
                     <meta itemprop="name" content="Cykelfærgen Flensborg Fjord">
                 </div>
             ';
-            } else {
-                $aggregateRating .= '<img src="' . $totalStars . '" alt="Rated to ' . $rating . '" class="trustRating">';
+        } else {
+            $aggregateRating .= '<img src="' . $totalStars . '" alt="Rated to ' . $rating . '" class="trustRating">';
 
-                $aggregateRatingMetaInfo = $row['aggregateRatingMeta'];
-            }
-
-
-            /* echo $aggregateRating; */
-            /* array_push($reviewItems, $itemRating); */
+            $aggregateRatingMetaInfo = $row['aggregateRatingMeta'];
         }
 
         $userName = $xpath->query('//span[@data-consumer-name-typography="true"]');
@@ -141,8 +145,13 @@ if (isset($_GET["trustpilot"])) {
             $reviewBody = $xpath->query('//p[@data-service-review-text-typography="true"]')->item(0)->nodeValue;
 
             // Get Headline parent element and get the href attribute
-            $headlineParentLink = $xpath->query('//h2[@data-service-review-title-typography="true"]')->item(0)->parentNode->attributes->getNamedItem('href');
-            $headlineParentLink = $headlineParentLink->nodeValue;
+            $headlineParentLink = $xpath->query('//a[@href="/reviews/"]');
+            
+            var_dump($headlineParentLink);
+
+            die();
+
+            $headlineParentLink = $headlineParentLink;
 
             $datePublished = $userRating->firstElementChild->nextElementSibling->firstChild->getAttribute('datetime');
 
@@ -178,7 +187,17 @@ if (isset($_GET["trustpilot"])) {
         $userName = $xpath->query('//span[@data-consumer-name-typography="true"]');
         $headline = $xpath->query('//h2[@data-service-review-title-typography="true"]')->item(0)->nodeValue;
         $reviewBody = $xpath->query('//p[@data-service-review-text-typography="true"]')->item(0)->nodeValue;
-        $writtenDate = $xpath->query('//p[@data-service-review-date-of-experience-typography="true"]')->item(0)->getAttribute('span');
+        $writtenDate = $xpath->query('//time[@data-service-review-date-time-ago="true"]')->item(0);
+
+        // Convert the writtenDate to a date format
+        $writtenDate = $writtenDate->getAttribute('datetime');
+
+        $writtenDate = str_replace("Datum der Erfahrung:", "", $writtenDate);
+        $writtenDate = str_replace("Dato for oplevelsen:", "", $writtenDate);
+        $writtenDate = str_replace("Date of experience:", "", $writtenDate);
+
+        $writtenDate = date("Y-m-d H:i:s", strtotime($writtenDate));
+
         // Find the div element with the class star-rating_medium__iN6Ty
         $reviewStars = $xpath->query('//div[@class="styles_reviewHeader__DzoAZ"]');
         // Convert reviewStars to string
@@ -236,11 +255,11 @@ if (isset($_GET["trustpilot"])) {
         $modifyedHtml = preg_replace('/^.*<html[^>]*>|<\/html>.*$/is', '', $modifyedHtml);
         $modifyedHtml = preg_replace('/^.*<!DOCTYPE[^>]*>|<html[^>]*>|<head[^>]*>|<body[^>]*>|<\/body>|<\/head>|<\/html>.*$/is', '', $modifyedHtml);
 
-        $trustscore = str_replace(",", ".", $trustscore);
+        echo $writtenDate;
 
-        echo $modifyedHtml;
+        $trustscore = str_replace(",", ".", $trustscore);
         $delete = $db->query("DELETE FROM totalReviews WHERE lang = '" . $lang . "'");
-        $insertTotalReviews = "INSERT INTO totalReviews (lang,total_reviews, aggregateRatingMeta, aggregateNumber) VALUES ('" . $lang . "','" . $totalReviewsPlus . "', '" . htmlentities($aggregateRatingMetaInfo) . "', '" . $trustscore . "')";
+        $insertTotalReviews = "INSERT INTO totalReviews (lang,total_reviews, aggregateRatingMeta, aggregateNumber) VALUES ('" . $lang . "','" . $totalReviews . "', '" . htmlentities($aggregateRatingMetaInfo) . "', '" . $trustscore . "')";
         $db->query($insertTotalReviews);
 
         $check = $db->query("SELECT * FROM reviews WHERE review = '" . htmlentities($modifyedHtml) . "'");
